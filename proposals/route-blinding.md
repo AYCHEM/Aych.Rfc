@@ -77,7 +77,19 @@ Route blinding introduces a new TLV field to the onion `tlv_payload`: the `encry
 This blob is used to carry the blinded `scid` to use when forwarding the message and may be
 extended with additional data in the future.
 
-TODO: detail the format.
+1. type: 10 (`enctlv`)
+2. data:
+    * [`...*byte`:`enctlv`]
+
+Once decrypted, the content of this encrypted blob is itself a TLV stream that may contain any
+tlv record defined in Bolt 4 (onion TLV namespace).
+
+We may also introduce another TLV field to authenticate the `enctlv` payload. It could look
+something like:
+
+1. type: 11 (`enctlv_mac`)
+2. data:
+    * [`...*byte`:`mac`]
 
 ### Creating a blinded route
 
