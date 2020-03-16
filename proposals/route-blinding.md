@@ -80,16 +80,10 @@ extended with additional data in the future.
 1. type: 10 (`enctlv`)
 2. data:
     * [`...*byte`:`enctlv`]
+    * [`32*byte`:`hmac`]
 
 Once decrypted, the content of this encrypted blob is itself a TLV stream that may contain any
 tlv record defined in Bolt 4 (onion TLV namespace).
-
-We may also introduce another TLV field to authenticate the `enctlv` payload. It could look
-something like:
-
-1. type: 11 (`enctlv_mac`)
-2. data:
-    * [`...*byte`:`mac`]
 
 ### Creating a blinded route
 
@@ -107,6 +101,7 @@ Blinding:
     ss(i) = H(e(i) * P(i)) = H(k(i) * E(i))         // shared secret known only by N(0) and N(i)
     B(i) = HMAC256("blinded_node_id", ss(i)) * P(i) // Blinded node_id for N(i), private key known only by N(i)
     rho(i) = HMAC256("rho", ss(i))                  // Key used to encrypt payload for N(i) by N(0)
+    mu(i) = HMAC256("mu", ss(i))                    // Key used for the encrypted blob mac
     E(i-1) = H(E(i) || ss(i)) * E(i)                // NB: N(i) must not learn e(i-1)
 
 Blinded route:
@@ -159,6 +154,8 @@ All the following intermediate nodes `N(i)` do the following steps:
   b(i) = HMAC256("blinded_node_id", ss(i)) * k(i)
   Use b(i) to decrypt the incoming onion
   rho(i) = HMAC256("rho", ss(i))
+  mu(i) = HMAC256("mu", ss(i))
+  Use mu(i) to validate the `encrypted_blob`'s mac
   Use rho(i) to decrypt the `encrypted_blob` inside the onion and discover the next node
   E(i-1) = H(E(i) || ss(i)) * E(i)
   Forward the onion to the next node and include E(i-1) in a TLV field in the message extension
@@ -243,6 +240,5 @@ performs worse than Sphinx in latency, bandwidth and privacy.
 
 ## Open Questions
 
-* Do we need macs?
 * Should we include feature bits in the blinded path? It's yet another probing vector so we'd need
   to "sanitize" them to avoid reducing the node's anonymity set...
