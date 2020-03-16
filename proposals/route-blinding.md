@@ -75,12 +75,11 @@ to receive onion messages.
 
 Route blinding introduces a new TLV field to the onion `tlv_payload`: the `encrypted_blob`.
 This blob is used to carry the blinded `scid` to use when forwarding the message and may be
-extended with additional data in the future.
+extended with additional data in the future. It uses ChaCha20-Poly1305 as AEAD scheme.
 
 1. type: 10 (`enctlv`)
 2. data:
     * [`...*byte`:`enctlv`]
-    * [`32*byte`:`hmac`]
 
 Once decrypted, the content of this encrypted blob is itself a TLV stream that may contain any
 tlv record defined in Bolt 4 (onion TLV namespace).
@@ -101,7 +100,6 @@ Blinding:
     ss(i) = H(e(i) * P(i)) = H(k(i) * E(i))         // shared secret known only by N(r) and N(i)
     B(i) = HMAC256("blinded_node_id", ss(i)) * P(i) // Blinded node_id for N(i), private key known only by N(i)
     rho(i) = HMAC256("rho", ss(i))                  // Key used to encrypt payload for N(i) by N(r)
-    mu(i) = HMAC256("mu", ss(i))                    // Key used for the encrypted blob mac
     E(i+1) = H(E(i) || ss(i)) * E(i)                // NB: N(i) must not learn e(i-1)
 
 Blinded route:
@@ -116,8 +114,9 @@ Note that this is exactly the same construction as Sphinx, but at each hop we us
 to derive a blinded `node_id` for `N(i)` for which the private key will only be known by `N(i)`.
 
 The recipient needs to provide `E(0)` and the blinded route to potential senders.
-The `encrypted_blob(i)` is encrypted with ChaCha20 using the `rho(i)` key, and contains the real
-`short_channel_id` to forward to (and potentially other fields).
+The `encrypted_blob(i)` is encrypted with ChaCha20-Poly1305 using the `rho(i)` key, and contains
+the real `short_channel_id` to forward to (and potentially other fields). `E(i)` is included as
+additional authenticated data to detect probing attempts by the sender.
 
 Note that the introduction point uses the real `node_id`, not the blinded one, because the sender
 needs to be able to locate this introduction point and find a route to it. But the sender will send
@@ -154,8 +153,6 @@ All the following intermediate nodes `N(i)` do the following steps:
   b(i) = HMAC256("blinded_node_id", ss(i)) * k(i)
   Use b(i) to decrypt the incoming onion
   rho(i) = HMAC256("rho", ss(i))
-  mu(i) = HMAC256("mu", ss(i))
-  Use mu(i) to validate the `encrypted_blob`'s mac
   Use rho(i) to decrypt the `encrypted_blob` inside the onion and discover the next node
   E(i+1) = H(E(i) || ss(i)) * E(i)
   Forward the onion to the next node and include E(i+1) in a TLV field in the message extension
@@ -203,6 +200,8 @@ The sender knows an upper bound on the distance between the recipient and `N(0)`
 is close to `N(0)`, this might not be ideal. In such cases, the recipient may add any number of
 dummy hops at the beginning of the blinded route by using `N(j) = N(r)`. The sender will not be
 able to distinguish those from normal blinded hops.
+
+Note that the recipient needs to fully validate each dummy hop to detect tampering.
 
 ### Wallets and unannounced channels
 
