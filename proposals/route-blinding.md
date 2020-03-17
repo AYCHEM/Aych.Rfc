@@ -100,7 +100,8 @@ Blinding:
     ss(i) = H(e(i) * P(i)) = H(k(i) * E(i))         // shared secret known only by N(r) and N(i)
     B(i) = HMAC256("blinded_node_id", ss(i)) * P(i) // Blinded node_id for N(i), private key known only by N(i)
     rho(i) = HMAC256("rho", ss(i))                  // Key used to encrypt payload for N(i) by N(r)
-    E(i+1) = H(E(i) || ss(i)) * E(i)                // NB: N(i) must not learn e(i-1)
+    e(i+1) = H(E(i) || ss(i)) * e(i)                // Ephemeral private key, only known by N(r)
+    E(i+1) = H(E(i) || ss(i)) * E(i)                // NB: N(i) must not learn e(i)
 
 Blinded route:
   
